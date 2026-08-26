@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>거상 사냥 장부</title>
+<meta name="description" content="거상(The Great Merchant) 사냥 수익·시급 계산기. 전리품과 지출을 적으면 순수익과 시급을 계산하고, 사냥터별 장부를 저장해 비교합니다.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23D9A441'/%3E%3Ccircle cx='50' cy='50' r='16' fill='%2316130D'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+:root{
+  --ink:#16130D;
+  --paper:#201B12;
+  --field:#2A2415;
+  --line:#3D3520;
+  --line-soft:#2E2818;
+  --brass:#D9A441;
+  --brass-dim:#8A6B2E;
+  --text:#EDE4CE;
+  --dim:#9C9074;
+  --faint:#6E654E;
+  --jade:#74BD8C;
+  --cinnabar:#E06C5A;
+  --serif:'Gowun Batang','Apple SD Gothic Neo','Malgun Gothic',serif;
+  --sans:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--ink);
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.55;
+  word-break:keep-all;
+  padding:0 16px calc(96px + env(safe-area-inset-bottom));
+}
+.wrap{max-width:760px;margin:0 auto}
+
+/* ---------- header ---------- */
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;padding:26px 0 8px;border-bottom:1px solid var(--line)}
+h1{font-family:var(--serif);font-weight:700;font-size:26px;letter-spacing:.02em;text-wrap:balance}
+h1 .coin{display:inline-block;width:.62em;height:.62em;border-radius:50%;background:var(--brass);position:relative;margin-right:.3em;vertical-align:baseline}
+h1 .coin::after{content:'';position:absolute;inset:31%;background:var(--ink)}
+.tagline{color:var(--dim);font-size:13px}
+.market-chip{
+  margin-left:auto;display:inline-flex;align-items:center;gap:6px;
+  border:1px solid var(--line);border-radius:999px;background:var(--paper);
+  color:var(--dim);font-size:12px;padding:5px 12px;cursor:pointer;font-family:var(--sans);
+}
+.market-chip:hover{border-color:var(--brass-dim);color:var(--text)}
+.market-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.market-chip.ok .dot{background:var(--jade)}
+.market-chip.err .dot{background:var(--cinnabar)}
+
+/* ---------- sections ---------- */
+section{margin-top:26px}
+.sec-head{display:flex;align-items:baseline;gap:10px;padding-bottom:8px;border-bottom:1px solid var(--line-soft);margin-bottom:12px}
+.sec-head h2{font-family:var(--serif);font-size:17px;font-weight:700;letter-spacing:.03em;white-space:nowrap}
+.sec-head .tick{width:14px;height:3px;background:var(--brass);align-self:center;flex:none}
+.sec-head .note{color:var(--faint);font-size:12px;margin-left:auto;text-align:right}
+.seal{flex:none;align-self:center;width:20px;height:20px;border:1.5px solid var(--cinnabar);color:var(--cinnabar);
+  font-family:var(--serif);font-size:12px;line-height:17px;text-align:center;border-radius:3px;opacity:.9}
+
+/* ---------- form bits ---------- */
+label.fld{display:block;color:var(--dim);font-size:12px;letter-spacing:.05em}
+label.fld > span:first-of-type{display:block;margin-bottom:5px}
+input,button{font:inherit;color:inherit}
+input[type=text],input[type=number]{
+  width:100%;background:var(--field);border:1px solid var(--line);border-radius:5px;
+  padding:9px 10px;font-size:16px;outline:none;font-variant-numeric:tabular-nums;
+}
+input::placeholder{color:var(--faint)}
+input:focus{border-color:var(--brass)}
+input.bad{border-color:var(--cinnabar)}
+input[type=number]{appearance:textfield}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{appearance:none;margin:0}
+button{cursor:pointer;background:none;border:none}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  border:1px solid var(--line);border-radius:5px;background:var(--field);
+  padding:9px 14px;font-size:14px;color:var(--text);min-height:40px;
+}
+.btn:hover{border-color:var(--brass-dim)}
+.btn.primary{background:var(--brass);border-color:var(--brass);color:#1B1503;font-weight:700}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn:focus-visible,input:focus-visible,.chip:focus-visible,.market-chip:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+
+/* 사냥 정보 */
+.info-grid{display:grid;grid-template-columns:1.55fr 1fr;gap:12px}
+.info-grid .spot{grid-column:1 / -1}
+.time-row{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
+.time-row input{width:56px;text-align:right}
+.time-row .u{color:var(--dim);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{
+  border:1px solid var(--line);border-radius:999px;background:var(--paper);
+  color:var(--dim);font-size:12px;padding:5px 11px;
+}
+.chip:hover{color:var(--text);border-color:var(--brass-dim)}
+.fee-row{display:flex;align-items:center;gap:6px}
+.fee-row input{width:74px;text-align:right}
+
+/* ---------- item rows ---------- */
+.rows{display:flex;flex-direction:column;gap:10px}
+.lrow{
+  display:grid;gap:7px;align-items:center;
+  grid-template-areas:"name name name del" "qty x price price" "chan chan sub sub";
+  grid-template-columns:78px 14px 1fr 34px;
+  padding:11px 12px;background:var(--paper);border:1px solid var(--line-soft);border-radius:6px;
+}
+.lrow.exp{grid-template-areas:"name name name del" "qty x price price" "sub sub sub sub"}
+.lrow .f-name{grid-area:name}
+.lrow .f-qty{grid-area:qty;text-align:right}
+.lrow .x{grid-area:x;color:var(--faint);text-align:center}
+.lrow .f-price{grid-area:price;text-align:right}
+.lrow .f-chan{grid-area:chan;justify-self:start}
+.lrow .f-del{grid-area:del;justify-self:end;color:var(--faint);font-size:16px;width:34px;height:34px;border-radius:5px}
+.lrow .f-del:hover{color:var(--cinnabar);background:var(--field)}
+.lrow .sub{grid-area:sub;text-align:right;color:var(--dim);font-size:13px;font-variant-numeric:tabular-nums}
+.lrow .sub b{color:var(--text);font-weight:500}
+.f-chan{
+  border:1px solid var(--line);border-radius:999px;background:var(--field);
+  color:var(--faint);font-size:12px;padding:5px 11px;white-space:nowrap;
+}
+.f-chan.on{border-color:var(--brass-dim);color:var(--brass);background:rgba(217,164,65,.08)}
+@media(min-width:680px){
+  .lrow{
+    grid-template-areas:"name qty x price chan sub del";
+    grid-template-columns:1.2fr 74px 14px 1fr auto 150px 34px;
+  }
+  .lrow.exp{
+    grid-template-areas:"name qty x price sub del";
+    grid-template-columns:1.2fr 74px 14px 1fr 150px 34px;
+  }
+  .lrow .f-chan{justify-self:end}
+  .lrow .sub{font-size:14px}
+}
+.rows-foot{display:flex;gap:8px;margin-top:10px}
+.empty-hint{color:var(--faint);font-size:13px;padding:4px 2px}
+
+/* ---------- 결산 ---------- */
+.result-card{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 16px 6px}
+.r-line{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line-soft);font-variant-numeric:tabular-nums}
+.r-line .k{color:var(--dim);font-size:13px}
+.r-line .v{font-size:15px}
+.r-line .v small{color:var(--faint);font-size:12px;margin-left:6px}
+.r-line.minus .v{color:var(--cinnabar)}
+.r-line.net{border-bottom:none}
+.r-line.net .k{color:var(--text)}
+.r-line.net .v{font-weight:700;font-size:17px}
+.hourly{
+  margin:10px -16px 0;padding:16px;border-top:1px solid var(--line);
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;
+}
+.hourly .k{color:var(--dim);font-size:13px;letter-spacing:.08em}
+.hourly .big{font-family:var(--serif);font-size:34px;font-weight:700;color:var(--brass);line-height:1.15;font-variant-numeric:tabular-nums}
+.hourly .big.loss{color:var(--cinnabar)}
+.hourly .exact{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums;flex-basis:100%}
+.pos{color:var(--jade)} .neg{color:var(--cinnabar)}
+
+/* breakdown */
+.break{margin-top:14px}
+.break table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.break th{color:var(--faint);font-weight:400;text-align:right;padding:4px 0;border-bottom:1px solid var(--line-soft);font-size:12px;letter-spacing:.05em}
+.break th:first-child,.break td:first-child{text-align:left}
+.break td{padding:6px 0;border-bottom:1px dashed var(--line-soft);text-align:right}
+.break td .bar-bg{display:block;height:3px;background:var(--line-soft);border-radius:2px;margin-top:4px;overflow:hidden}
+.break td .bar-fill{display:block;height:100%;background:var(--brass-dim)}
+.break tr:last-child td{border-bottom:none}
+
+/* ---------- 비교 ---------- */
+.save-row{display:flex;gap:8px;margin-bottom:12px}
+.save-row input{flex:1}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line-soft);border-radius:6px;background:var(--paper)}
+table.cmp{width:100%;border-collapse:collapse;font-size:13px;min-width:480px;font-variant-numeric:tabular-nums}
+.cmp th{color:var(--faint);font-weight:400;font-size:12px;text-align:right;padding:9px 12px;border-bottom:1px solid var(--line);letter-spacing:.05em;white-space:nowrap}
+.cmp th:first-child{text-align:left}
+.cmp td{padding:9px 12px;border-bottom:1px solid var(--line-soft);text-align:right;white-space:nowrap}
+.cmp td:first-child{text-align:left;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.cmp tr:last-child td{border-bottom:none}
+.cmp tr.current td{background:rgba(217,164,65,.05)}
+.cmp .who{color:var(--faint);font-size:11px;margin-left:6px}
+.cmp .best{display:inline-block;border:1px solid var(--brass-dim);color:var(--brass);font-size:10px;border-radius:3px;padding:0 5px;margin-left:6px;vertical-align:1px}
+.cmp .hr{color:var(--brass);font-weight:700}
+.cmp .act{color:var(--dim);font-size:12px;padding:4px 6px;border-radius:4px}
+.cmp .act:hover{color:var(--text);background:var(--field)}
+.cmp .act.danger:hover{color:var(--cinnabar)}
+
+/* ---------- footer / bar / toast ---------- */
+footer{margin-top:34px;padding:16px 0 8px;border-top:1px solid var(--line-soft);color:var(--faint);font-size:12px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+footer .lnk{color:var(--dim);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+footer .lnk:hover{color:var(--text)}
+.bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;cursor:pointer;
+  background:rgba(22,19,13,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-top:1px solid var(--line);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+.bar-in{max-width:760px;margin:0 auto;display:flex;align-items:baseline;gap:12px;font-variant-numeric:tabular-nums}
+.bar-in .k{color:var(--dim);font-size:12px;letter-spacing:.08em}
+.bar-in .v{font-family:var(--serif);font-size:21px;font-weight:700;color:var(--brass)}
+.bar-in .v.loss{color:var(--cinnabar)}
+.bar-in .net{margin-left:auto;color:var(--dim);font-size:12px}
+.bar-in .net b{color:var(--text);font-weight:500}
+.toast{
+  position:fixed;left:50%;bottom:calc(72px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(8px);
+  background:var(--field);border:1px solid var(--brass-dim);color:var(--text);
+  border-radius:6px;padding:8px 16px;font-size:13px;opacity:0;pointer-events:none;
+  transition:opacity .18s,transform .18s;z-index:30;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1><span class="coin" aria-hidden="true"></span>거상 사냥 장부</h1>
+  <span class="tagline">사냥 수익 · 시급 계산</span>
+  <button class="market-chip" id="marketChip" type="button" title="시세 데이터 다시 불러오기">
+    <span class="dot"></span><span id="marketChipText">시세 확인 중…</span><span aria-hidden="true">↻</span>
+  </button>
+</header>
+
+<section id="secInfo">
+  <div class="sec-head"><span class="tick" aria-hidden="true"></span><h2>사냥 정보</h2></div>
+  <div class="info-grid">
+    <label class="fld spot"><span>사냥터</span>
+      <input type="text" id="inSpot" placeholder="예: 아방궁 3층" autocomplete="off">
+    </label>
+    <label class="fld"><span>사냥 시간</span>
+      <span class="time-row">
+        <input type="number" id="inH" min="0" step="1" inputmode="numeric"><span class="u">시간</span>
+        <input type="number" id="inM" min="0" max="59" step="1" inputmode="numeric"><span class="u">분</span>
+      </span>
+      <span class="chips">
+        <button type="button" class="chip" data-min="30">30분</button>
+        <button type="button" class="chip" data-min="60">1시간</button>
+        <button type="button" class="chip" data-min="90">1시간 30분</button>
+        <button type="button" class="chip" data-min="120">2시간</button>
+      </span>
+    </label>
+    <label class="fld"><span>장터 수수료</span>
+      <span class="fee-row">
+        <input type="number" id="inFee" min="0" max="100" step="0.5" inputmode="decimal"><span class="u">%</span>
+      </span>
+    </label>
+  </div>
+</section>
+
+<section id="secLoot">
+  <div class="sec-head"><span class="tick" aria-hidden="true"></span><h2>전리품</h2>
+    <span class="note">「장터」 표시가 켜진 품목에만 수수료가 붙습니다</span></div>
+  <div class="rows" id="lootRows"></div>
+  <div class="rows-foot"><button type="button" class="btn" id="btnAddLoot">＋ 전리품 추가</button></div>
+</section>
+
+<section id="secExp">
+  <div class="sec-head"><span class="tick" aria-hidden="true"></span><h2>지출</h2>
+    <span class="note">물약·소모품·입장료 등</span></div>
+  <div class="rows" id="expRows"></div>
+  <div class="empty-hint hidden" id="expEmpty">지출이 없으면 비워 두세요.</div>
+  <div class="rows-foot"><button type="button" class="btn" id="btnAddExp">＋ 지출 추가</button></div>
+</section>
+
+<section id="secResult">
+  <div class="sec-head"><span class="seal" aria-hidden="true">計</span><h2>결산</h2></div>
+  <div class="result-card">
+    <div class="r-line"><span class="k">전리품 판매액</span><span class="v" id="rGross"></span></div>
+    <div class="r-line minus"><span class="k">장터 수수료 <small id="rFeePct"></small></span><span class="v" id="rFee"></span></div>
+    <div class="r-line minus"><span class="k">지출</span><span class="v" id="rExp"></span></div>
+    <div class="r-line net"><span class="k">순수익 <small id="rDur"></small></span><span class="v" id="rNet"></span></div>
+    <div class="hourly">
+      <span class="k">시급</span>
+      <span class="big" id="rHourly"></span><span class="k">냥/시간</span>
+      <span class="exact" id="rHourlyExact"></span>
+    </div>
+  </div>
+  <div class="break" id="breakWrap">
+    <table aria-label="전리품별 판매액 비중">
+      <thead><tr><th>품목</th><th>수량</th><th>판매액</th><th>비중</th></tr></thead>
+      <tbody id="breakBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="secCompare">
+  <div class="sec-head"><span class="tick" aria-hidden="true"></span><h2>사냥터 비교</h2>
+    <span class="note">현재 입력을 장부에 저장해 시급을 비교합니다</span></div>
+  <div class="save-row">
+    <input type="text" id="inPresetName" placeholder="저장 이름 (비우면 사냥터 이름)" autocomplete="off">
+    <button type="button" class="btn primary" id="btnSavePreset">장부에 저장</button>
+  </div>
+  <div class="tbl-wrap">
+    <table class="cmp" aria-label="사냥터별 시급 비교">
+      <thead><tr><th>사냥터</th><th>시급</th><th>순수익</th><th>시간</th><th>저장</th><th></th></tr></thead>
+      <tbody id="cmpBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <span>가격은 <code>market_prices.json</code> 시세와 내가 입력한 가격에서 자동 완성됩니다. 금액은 <b>1.5억</b>, <b>3000만</b>처럼 적어도 됩니다.</span>
+  <button type="button" class="lnk" id="btnImport">시세 JSON 직접 열기</button>
+  <button type="button" class="lnk" id="btnReset">입력 초기화</button>
+  <input type="file" id="fileImport" accept=".json,application/json" class="hidden">
+</footer>
+
+</div>
+
+<button class="bar" id="bar" type="button" aria-label="결산으로 이동">
+  <span class="bar-in">
+    <span class="k">시급</span><span class="v" id="barHourly"></span>
+    <span class="net">순수익 <b id="barNet"></b></span>
+  </span>
+</button>
+<div class="toast" id="toast" role="status"></div>
+<datalist id="itemNames"></datalist>
+
+<script>
+'use strict';
+/* ---------------- 저장소 ---------------- */
+var LS = { state:'ghc.v1.state', presets:'ghc.v1.presets', prices:'ghc.v1.pricebook' };
+function lsGet(k, fb){ try{ var v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+
+/* ---------------- 금액 파싱/표기 ---------------- */
+var nf = new Intl.NumberFormat('ko-KR');
+function parseAmount(raw){
+  if(raw == null) return NaN;
+  var s = String(raw).trim().replace(/[,\s냥]/g,'');
+  if(!s) return NaN;
+  var sign = 1;
+  if(s.charAt(0) === '-'){ sign = -1; s = s.slice(1); }
+  if(/^\d+(\.\d+)?$/.test(s)) return sign * Number(s);
+  var m = s.match(/^(?:(\d+(?:\.\d+)?)억)?(?:(\d+(?:\.\d+)?)만)?(\d+(?:\.\d+)?)?$/);
+  if(!m || (m[1] == null && m[2] == null)) return NaN;
+  return sign * ((Number(m[1]) || 0) * 1e8 + (Number(m[2]) || 0) * 1e4 + (Number(m[3]) || 0));
+}
+function fmtKo(n){
+  if(!isFinite(n)) return '—';
+  n = Math.round(n);
+  var neg = n < 0; n = Math.abs(n);
+  var eok = Math.floor(n / 1e8), man = Math.floor(n % 1e8 / 1e4), rest = n % 1e4;
+  var parts = [];
+  if(eok) parts.push(nf.format(eok) + '억');
+  if(man) parts.push(nf.format(man) + '만');
+  if(rest || !parts.length) parts.push(nf.format(rest));
+  return (neg ? '-' : '') + parts.join(' ');
+}
+function num(v){ var n = Number(v); return isFinite(n) ? n : 0; }
+function uid(){ return Math.random().toString(36).slice(2, 10); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function normName(s){ return String(s || '').trim(); }
+
+/* ---------------- 상태 ---------------- */
+function newLoot(){ return { id:uid(), name:'', qty:1, price:0, market:true }; }
+function newExp(){ return { id:uid(), name:'', qty:1, price:0 }; }
+function defState(){ return { spot:'', h:1, m:0, fee:5, loot:[newLoot()], exp:[] }; }
+function sanitize(st){
+  if(!st || typeof st !== 'object') return defState();
+  var s = defState();
+  s.spot = typeof st.spot === 'string' ? st.spot : '';
+  s.h = num(st.h); s.m = num(st.m);
+  s.fee = isFinite(Number(st.fee)) ? Number(st.fee) : 5;
+  s.loot = Array.isArray(st.loot) ? st.loot.map(function(r){
+    return { id:r.id || uid(), name:normName(r.name), qty:num(r.qty), price:num(r.price), market:r.market !== false };
+  }) : [newLoot()];
+  if(!s.loot.length) s.loot = [newLoot()];
+  s.exp = Array.isArray(st.exp) ? st.exp.map(function(r){
+    return { id:r.id || uid(), name:normName(r.name), qty:num(r.qty), price:num(r.price) };
+  }) : [];
+  return s;
+}
+var state = sanitize(lsGet(LS.state, null));
+var presets = lsGet(LS.presets, []);
+if(!Array.isArray(presets)) presets = [];
+var priceBook = lsGet(LS.prices, {});
+if(!priceBook || typeof priceBook !== 'object') priceBook = {};
+var market = { map:new Map(), generatedAt:null, status:'loading' };
+
+var saveTimer = null;
+function saveStateSoon(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){ lsSet(LS.state, state); }, 250);
+}
+function flushState(){ clearTimeout(saveTimer); lsSet(LS.state, state); }
+window.addEventListener('pagehide', flushState);
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'hidden') flushState();
+});
+
+/* ---------------- 계산 ---------------- */
+function compute(){
+  var feeRate = Math.min(100, Math.max(0, num(state.fee))) / 100;
+  var gross = 0, fee = 0, expTotal = 0, per = [];
+  state.loot.forEach(function(r){
+    var amt = num(r.qty) * num(r.price);
+    if(!amt && !r.name) return;
+    gross += amt;
+    var f = r.market ? amt * feeRate : 0;
+    fee += f;
+    per.push({ name:r.name || '(이름 없음)', qty:num(r.qty), amt:amt });
+  });
+  state.exp.forEach(function(r){ expTotal += num(r.qty) * num(r.price); });
+  var net = gross - fee - expTotal;
+  var durMin = num(state.h) * 60 + num(state.m);
+  var hourly = durMin > 0 ? net / (durMin / 60) : NaN;
+  per.sort(function(a, b){ return b.amt - a.amt; });
+  return { gross:gross, fee:fee, expTotal:expTotal, net:net, durMin:durMin, hourly:hourly, per:per };
+}
+function fmtDur(min){
+  var h = Math.floor(min / 60), m = Math.round(min % 60);
+  if(min <= 0) return '0분';
+  return (h ? h + '시간' : '') + (h && m ? ' ' : '') + (m ? m + '분' : '');
+}
+
+/* ---------------- 행 렌더링 ---------------- */
+var $ = function(id){ return document.getElementById(id); };
+var lootRowsEl = $('lootRows'), expRowsEl = $('expRows');
+
+function priceAttr(p){ return p > 0 ? nf.format(p) : ''; }
+function qtyAttr(q){ return q === 1 ? '1' : (isFinite(q) ? String(q) : '1'); }
+
+function lootRowHtml(r){
+  return '<div class="lrow" data-id="' + r.id + '" data-kind="loot">' +
+    '<input type="text" class="f-name" list="itemNames" placeholder="아이템 이름" autocomplete="off" value="' + esc(r.name) + '">' +
+    '<button type="button" class="f-chan' + (r.market ? ' on' : '') + '" title="장터 판매 여부 (켜면 수수료 적용)">' + (r.market ? '장터' : '상점·기타') + '</button>' +
+    '<button type="button" class="f-del" title="행 삭제" aria-label="행 삭제">✕</button>' +
+    '<input type="text" class="f-qty" inputmode="decimal" placeholder="수량" value="' + qtyAttr(r.qty) + '">' +
+    '<span class="x" aria-hidden="true">×</span>' +
+    '<input type="text" class="f-price" inputmode="numeric" placeholder="개당 가격" value="' + priceAttr(r.price) + '">' +
+    '<span class="sub"></span>' +
+  '</div>';
+}
+function expRowHtml(r){
+  return '<div class="lrow exp" data-id="' + r.id + '" data-kind="exp">' +
+    '<input type="text" class="f-name" list="itemNames" placeholder="지출 항목 (예: 물약)" autocomplete="off" value="' + esc(r.name) + '">' +
+    '<button type="button" class="f-del" title="행 삭제" aria-label="행 삭제">✕</button>' +
+    '<input type="text" class="f-qty" inputmode="decimal" placeholder="수량" value="' + qtyAttr(r.qty) + '">' +
+    '<span class="x" aria-hidden="true">×</span>' +
+    '<input type="text" class="f-price" inputmode="numeric" placeholder="개당 가격" value="' + priceAttr(r.price) + '">' +
+    '<span class="sub"></span>' +
+  '</div>';
+}
+function renderRows(){
+  lootRowsEl.innerHTML = state.loot.map(lootRowHtml).join('');
+  expRowsEl.innerHTML = state.exp.map(expRowHtml).join('');
+  $('expEmpty').classList.toggle('hidden', state.exp.length > 0);
+  state.loot.forEach(function(r){ updateRowSub(r.id, 'loot'); });
+  state.exp.forEach(function(r){ updateRowSub(r.id, 'exp'); });
+}
+function findRow(kind, id){
+  var arr = kind === 'loot' ? state.loot : state.exp;
+  for(var i = 0; i < arr.length; i++) if(arr[i].id === id) return arr[i];
+  return null;
+}
+function updateRowSub(id, kind){
+  var el = document.querySelector('.lrow[data-id="' + id + '"] .sub');
+  var r = findRow(kind, id);
+  if(!el || !r) return;
+  var amt = num(r.qty) * num(r.price);
+  el.innerHTML = amt ? '= <b>' + esc(fmtKo(amt)) + '냥</b>' : '';
+}
+
+/* ---------------- 결과 렌더링 ---------------- */
+function updateResults(){
+  var c = compute();
+  $('rGross').textContent = fmtKo(c.gross) + '냥';
+  $('rFeePct').textContent = '(' + num(state.fee) + '%)';
+  $('rFee').textContent = c.fee ? '-' + fmtKo(c.fee) + '냥' : '0냥';
+  $('rExp').textContent = c.expTotal ? '-' + fmtKo(c.expTotal) + '냥' : '0냥';
+  var netEl = $('rNet');
+  netEl.textContent = fmtKo(c.net) + '냥';
+  netEl.className = 'v ' + (c.net > 0 ? 'pos' : c.net < 0 ? 'neg' : '');
+  $('rDur').textContent = c.durMin > 0 ? '· ' + fmtDur(c.durMin) + ' 사냥' : '· 사냥 시간을 입력하세요';
+  var hEl = $('rHourly');
+  hEl.textContent = fmtKo(c.hourly);
+  hEl.classList.toggle('loss', isFinite(c.hourly) && c.hourly < 0);
+  $('rHourlyExact').textContent = isFinite(c.hourly) ? '= ' + nf.format(Math.round(c.hourly)) + '냥/시간' : '사냥 시간을 입력하면 시급이 계산됩니다';
+  var bh = $('barHourly');
+  bh.textContent = isFinite(c.hourly) ? fmtKo(c.hourly) + '냥' : '—';
+  bh.classList.toggle('loss', isFinite(c.hourly) && c.hourly < 0);
+  $('barNet').textContent = fmtKo(c.net) + '냥';
+
+  var rows = c.per.filter(function(p){ return p.amt > 0; });
+  var body = $('breakBody');
+  $('breakWrap').classList.toggle('hidden', rows.length < 2);
+  body.innerHTML = rows.map(function(p){
+    var share = c.gross > 0 ? p.amt / c.gross * 100 : 0;
+    return '<tr><td>' + esc(p.name) +
+      '<span class="bar-bg"><span class="bar-fill" style="width:' + share.toFixed(1) + '%"></span></span></td>' +
+      '<td>' + nf.format(p.qty) + '</td>' +
+      '<td>' + esc(fmtKo(p.amt)) + '냥</td>' +
+      '<td>' + share.toFixed(1) + '%</td></tr>';
+  }).join('');
+  renderCompare(c);
+}
+
+/* ---------------- 사냥터 비교 ---------------- */
+function renderCompare(c){
+  c = c || compute();
+  var list = presets.slice().sort(function(a, b){
+    var x = isFinite(a.hourly) ? a.hourly : -Infinity, y = isFinite(b.hourly) ? b.hourly : -Infinity;
+    return y - x;
+  });
+  var bestId = list.length && isFinite(list[0].hourly) ? list[0].id : null;
+  var html = '<tr class="current"><td>' + (esc(state.spot) || '현재 입력') + '<span class="who">현재</span></td>' +
+    '<td class="hr">' + esc(fmtKo(c.hourly)) + '</td>' +
+    '<td>' + esc(fmtKo(c.net)) + '</td>' +
+    '<td>' + fmtDur(c.durMin) + '</td><td>—</td><td></td></tr>';
+  html += list.map(function(p){
+    var d = new Date(p.at);
+    var when = (d.getMonth() + 1) + '.' + d.getDate();
+    return '<tr data-pid="' + p.id + '"><td>' + esc(p.name) + (p.id === bestId ? '<span class="best">최고</span>' : '') + '</td>' +
+      '<td class="hr">' + esc(fmtKo(p.hourly)) + '</td>' +
+      '<td>' + esc(fmtKo(p.net)) + '</td>' +
+      '<td>' + fmtDur(p.durMin) + '</td>' +
+      '<td>' + when + '</td>' +
+      '<td><button type="button" class="act" data-act="load">불러오기</button>' +
+      '<button type="button" class="act danger" data-act="del" aria-label="삭제">✕</button></td></tr>';
+  }).join('');
+  $('cmpBody').innerHTML = html;
+}
+
+/* ---------------- 시세 데이터 ---------------- */
+function firstNum(){
+  for(var i = 0; i < arguments.length; i++){
+    var n = Number(arguments[i]);
+    if(arguments[i] != null && arguments[i] !== '' && isFinite(n)) return n;
+  }
+  return NaN;
+}
+function applyMarket(data){
+  var arr = Array.isArray(data) ? data : (data && (data.items || data.prices)) || [];
+  market.map = new Map();
+  arr.forEach(function(it){
+    if(!it || typeof it !== 'object') return;
+    var name = it.name != null ? it.name : (it.item_name != null ? it.item_name : (it.item != null ? it.item : it.title));
+    var price = firstNum(it.price, it.avg_price, it.average, it.recent_price, it.median_price, it.min_price, it.value);
+    if(name && isFinite(price)) market.map.set(normName(name), price);
+  });
+  market.generatedAt = data && !Array.isArray(data) ? (data.generated_at || data.generatedAt || null) : null;
+  market.status = 'ok';
+  setMarketChip();
+  refreshDatalist();
+}
+function setMarketChip(){
+  var chip = $('marketChip'), txt = $('marketChipText');
+  chip.classList.remove('ok', 'err');
+  if(market.status === 'loading'){ txt.textContent = '시세 확인 중…'; return; }
+  if(market.status === 'error'){ chip.classList.add('err'); txt.textContent = '시세 없음 · 직접 입력'; return; }
+  if(!market.map.size){ txt.textContent = '시세 0개 · 직접 입력'; return; }
+  chip.classList.add('ok');
+  var when = '';
+  if(market.generatedAt){
+    var d = new Date(market.generatedAt);
+    if(!isNaN(d)) when = ' · ' + (d.getMonth() + 1) + '.' + d.getDate() + ' ' +
+      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  txt.textContent = '시세 ' + nf.format(market.map.size) + '개' + when;
+}
+function loadMarket(){
+  market.status = 'loading'; setMarketChip();
+  fetch('market_prices.json?t=' + Date.now(), { cache:'no-store' })
+    .then(function(res){ if(!res.ok) throw new Error(res.status); return res.json(); })
+    .then(applyMarket)
+    .catch(function(){ market.status = 'error'; setMarketChip(); });
+}
+function refreshDatalist(){
+  var names = new Set();
+  market.map.forEach(function(_, k){ names.add(k); });
+  Object.keys(priceBook).forEach(function(k){ names.add(k); });
+  $('itemNames').innerHTML = Array.from(names).sort().map(function(n){
+    return '<option value="' + esc(n) + '"></option>';
+  }).join('');
+}
+function lookupPrice(name){
+  var k = normName(name);
+  if(!k) return NaN;
+  if(priceBook[k] != null && isFinite(Number(priceBook[k]))) return Number(priceBook[k]);
+  if(market.map.has(k)) return market.map.get(k);
+  return NaN;
+}
+function rememberPrice(name, price){
+  var k = normName(name);
+  if(!k || !(price > 0)) return;
+  if(priceBook[k] === price) return;
+  priceBook[k] = price;
+  lsSet(LS.prices, priceBook);
+  refreshDatalist();
+}
+
+/* ---------------- 이벤트 ---------------- */
+function toast(msg){
+  var t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function(){ t.classList.remove('show'); }, 1600);
+}
+
+function onRowsInput(e){
+  var row = e.target.closest('.lrow');
+  if(!row) return;
+  var r = findRow(row.dataset.kind, row.dataset.id);
+  if(!r) return;
+  if(e.target.classList.contains('f-name')){
+    r.name = e.target.value;
+  }else if(e.target.classList.contains('f-qty')){
+    var q = parseAmount(e.target.value);
+    r.qty = isFinite(q) ? q : 0;
+    e.target.classList.toggle('bad', e.target.value.trim() !== '' && !isFinite(q));
+  }else if(e.target.classList.contains('f-price')){
+    var p = parseAmount(e.target.value);
+    r.price = isFinite(p) ? p : 0;
+    e.target.classList.toggle('bad', e.target.value.trim() !== '' && !isFinite(p));
+  }else return;
+  updateRowSub(r.id, row.dataset.kind);
+  updateResults();
+  saveStateSoon();
+}
+function onRowsClick(e){
+  var row = e.target.closest('.lrow');
+  if(!row) return;
+  var kind = row.dataset.kind;
+  var arr = kind === 'loot' ? state.loot : state.exp;
+  var r = findRow(kind, row.dataset.id);
+  if(!r) return;
+  if(e.target.classList.contains('f-del')){
+    var i = arr.indexOf(r);
+    if(i > -1) arr.splice(i, 1);
+    if(kind === 'loot' && !arr.length) arr.push(newLoot());
+    renderRows(); updateResults(); saveStateSoon();
+  }else if(e.target.classList.contains('f-chan')){
+    r.market = !r.market;
+    e.target.classList.toggle('on', r.market);
+    e.target.textContent = r.market ? '장터' : '상점·기타';
+    updateResults(); saveStateSoon();
+  }
+}
+function onRowsFocusout(e){
+  var row = e.target.closest('.lrow');
+  if(!row) return;
+  var r = findRow(row.dataset.kind, row.dataset.id);
+  if(!r) return;
+  if(e.target.classList.contains('f-price')){
+    if(r.price > 0){
+      e.target.value = nf.format(r.price);
+      e.target.classList.remove('bad');
+      rememberPrice(r.name, r.price);
+    }
+  }else if(e.target.classList.contains('f-name')){
+    var name = normName(e.target.value);
+    if(name && !(r.price > 0)){
+      var p = lookupPrice(name);
+      if(isFinite(p)){
+        r.price = p;
+        var priceEl = row.querySelector('.f-price');
+        if(priceEl) priceEl.value = nf.format(p);
+        updateRowSub(r.id, row.dataset.kind);
+        updateResults(); saveStateSoon();
+        toast('가격 자동 입력: ' + fmtKo(p) + '냥');
+      }
+    }
+  }
+}
+lootRowsEl.addEventListener('input', onRowsInput);
+expRowsEl.addEventListener('input', onRowsInput);
+lootRowsEl.addEventListener('click', onRowsClick);
+expRowsEl.addEventListener('click', onRowsClick);
+lootRowsEl.addEventListener('focusout', onRowsFocusout);
+expRowsEl.addEventListener('focusout', onRowsFocusout);
+
+$('btnAddLoot').addEventListener('click', function(){
+  state.loot.push(newLoot());
+  renderRows(); updateResults(); saveStateSoon();
+  var last = lootRowsEl.querySelector('.lrow:last-child .f-name');
+  if(last) last.focus();
+});
+$('btnAddExp').addEventListener('click', function(){
+  state.exp.push(newExp());
+  renderRows(); updateResults(); saveStateSoon();
+  var last = expRowsEl.querySelector('.lrow:last-child .f-name');
+  if(last) last.focus();
+});
+
+$('inSpot').addEventListener('input', function(){ state.spot = this.value; updateResults(); saveStateSoon(); });
+$('inH').addEventListener('input', function(){ state.h = num(this.value); updateResults(); saveStateSoon(); });
+$('inM').addEventListener('input', function(){ state.m = num(this.value); updateResults(); saveStateSoon(); });
+$('inFee').addEventListener('input', function(){
+  var f = Number(this.value);
+  state.fee = isFinite(f) ? Math.min(100, Math.max(0, f)) : 0;
+  updateResults(); saveStateSoon();
+});
+document.querySelectorAll('.chip[data-min]').forEach(function(ch){
+  ch.addEventListener('click', function(){
+    var t = Number(ch.dataset.min);
+    state.h = Math.floor(t / 60); state.m = t % 60;
+    $('inH').value = state.h; $('inM').value = state.m;
+    updateResults(); saveStateSoon();
+  });
+});
+
+$('btnSavePreset').addEventListener('click', function(){
+  var c = compute();
+  var name = normName($('inPresetName').value) || normName(state.spot) || '이름 없는 사냥터';
+  presets = presets.filter(function(p){ return p.name !== name; });
+  presets.unshift({ id:uid(), name:name, at:Date.now(),
+    state:JSON.parse(JSON.stringify(state)), hourly:c.hourly, net:c.net, durMin:c.durMin });
+  lsSet(LS.presets, presets);
+  $('inPresetName').value = '';
+  renderCompare();
+  toast('「' + name + '」 저장됨');
+});
+$('cmpBody').addEventListener('click', function(e){
+  var btn = e.target.closest('button[data-act]');
+  if(!btn) return;
+  var tr = btn.closest('tr[data-pid]');
+  if(!tr) return;
+  var p = null;
+  for(var i = 0; i < presets.length; i++) if(presets[i].id === tr.dataset.pid) p = presets[i];
+  if(!p) return;
+  if(btn.dataset.act === 'load'){
+    state = sanitize(p.state);
+    initInputs(); renderRows(); updateResults(); saveStateSoon();
+    toast('「' + p.name + '」 불러옴');
+    window.scrollTo({ top:0, behavior:'smooth' });
+  }else if(btn.dataset.act === 'del'){
+    if(!confirm('「' + p.name + '」 기록을 삭제할까요?')) return;
+    presets = presets.filter(function(x){ return x.id !== p.id; });
+    lsSet(LS.presets, presets);
+    renderCompare();
+  }
+});
+
+$('marketChip').addEventListener('click', loadMarket);
+$('btnImport').addEventListener('click', function(){ $('fileImport').click(); });
+$('fileImport').addEventListener('change', function(){
+  var f = this.files && this.files[0];
+  this.value = '';
+  if(!f) return;
+  var rd = new FileReader();
+  rd.onload = function(){
+    try{ applyMarket(JSON.parse(rd.result)); toast('시세 ' + market.map.size + '개 불러옴'); }
+    catch(e){ toast('JSON을 읽을 수 없습니다'); }
+  };
+  rd.readAsText(f);
+});
+$('btnReset').addEventListener('click', function(){
+  if(!confirm('입력을 모두 지울까요? (장부에 저장한 사냥터와 가격 기억은 유지됩니다)')) return;
+  state = defState();
+  initInputs(); renderRows(); updateResults(); saveStateSoon();
+});
+$('bar').addEventListener('click', function(){
+  document.getElementById('secResult').scrollIntoView({ behavior:'smooth', block:'start' });
+});
+
+/* ---------------- 시작 ---------------- */
+function initInputs(){
+  $('inSpot').value = state.spot;
+  $('inH').value = state.h;
+  $('inM').value = state.m;
+  $('inFee').value = state.fee;
+}
+initInputs();
+renderRows();
+updateResults();
+refreshDatalist();
+loadMarket();
+</script>
+</body>
+</html>
